@@ -60,7 +60,7 @@ app.post("/api/ai", async (req, res) => {
 
     res.status(500).json({
       ok: false,
-      error: "AI request failed"
+      error: error.message || "AI request failed"
     });
   }
 });
