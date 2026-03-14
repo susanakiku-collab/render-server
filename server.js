@@ -5,28 +5,19 @@ import OpenAI from "openai";
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-const allowedOrigins = [
-  process.env.FRONTEND_ORIGIN,
-  "http://127.0.0.1:5500",
-  "http://localhost:5500"
-].filter(Boolean);
+/* ---------------- CORS 完全許可 ---------------- */
+app.use(cors());
+app.options("*", cors());
 
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-      return;
-    }
-    callback(new Error(`CORS blocked: ${origin}`));
-  }
-}));
-
+/* ---------------- JSON ---------------- */
 app.use(express.json({ limit: "1mb" }));
 
+/* ---------------- OpenAI ---------------- */
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+/* ---------------- サーバー確認 ---------------- */
 app.get("/", (_req, res) => {
   res.json({
     ok: true,
@@ -39,35 +30,42 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+/* ---------------- AI API ---------------- */
 app.post("/api/ai", async (req, res) => {
   try {
-    const { prompt } = req.body || {};
+    const { prompt } = req.body;
 
     if (!prompt) {
-      return res.status(400).json({
-        ok: false,
-        error: "prompt is required"
-      });
+      res.status(400).json({ ok: false, error: "prompt required" });
+      return;
     }
 
-    const response = await client.responses.create({
-      model: "gpt-5",
-      input: prompt
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a dispatch optimization AI." },
+        { role: "user", content: prompt }
+      ]
     });
+
+    const text = completion.choices[0].message.content;
 
     res.json({
       ok: true,
-      text: response.output_text
+      text
     });
+
   } catch (error) {
-    console.error("AI route error:", error);
+    console.error("AI error:", error);
+
     res.status(500).json({
       ok: false,
-      error: error.message
+      error: "AI request failed"
     });
   }
 });
 
+/* ---------------- 起動 ---------------- */
 app.listen(PORT, () => {
-  console.log(`THEMIS AI server running on port ${PORT}`);
+  console.log("THEMIS AI server running on port", PORT);
 });
